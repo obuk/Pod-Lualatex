@@ -4,9 +4,10 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.0.1');
+our $VERSION = qv('0.1.0');
 
 use parent qw(Pod::LaTeX);
+use YAML::Any qw/LoadFile/;
 
 sub UserPreamble {
   my $self = shift;
@@ -19,18 +20,13 @@ sub UserPreamble {
   my $date = gmtime(time);
 
   # Comment message to say where this came from
-  my $comment = << "__TEX_COMMENT__";
+  my %x; $x{comment} = << "__TEX_COMMENT__";
 %%  Latex generated from POD in document $infile
 %%  Using the perl module $class
 %%  Converted on $date
 __TEX_COMMENT__
 
-  # Write the preamble
-  # If the caller has supplied one then we just use that
-
-  my $preamble = '';
-
-  # Write our own preamble
+  # Make our own preamble
 
   # Code to initialise index making
   # Use an array so that we can prepend comment if required
@@ -44,30 +40,32 @@ __TEX_COMMENT__
       $_ = '%% ' . $_;
     }
   }
-  my $makeindex = join("\n",@makeidx) . "\n";
+  $x{makeindex} = join("\n", @makeidx) . "\n";
 
   # Table of contents
-  my $tableofcontents = '\tableofcontents';
-
-  $tableofcontents = '%% ' . $tableofcontents
+  $x{tableofcontents} = '\tableofcontents';
+  $x{tableofcontents} = '%% ' . $x{tableofcontents}
     unless $self->TableOfContents;
 
+  my $preamble = $self->{preamble};
+
   # Roll our own
-  $preamble = << "__TEX_HEADER__";
-\\documentclass{ltjsarticle}
-\\usepackage[T1]{fontenc}
-\\usepackage{textcomp}
+  $preamble //= << '__TEX_HEADER__';
+\documentclass{ltjsarticle}
+\usepackage[T1]{fontenc}
+\usepackage{textcomp}
 
 $comment
 
 $makeindex
 
-\\begin{document}
+\begin{document}
 
 $tableofcontents
 
 __TEX_HEADER__
 
+  $preamble =~ s/\$(\w+)/$x{$1}/g;
   $preamble;
 }
 
@@ -83,22 +81,34 @@ sub command {
 }
 
 
+sub initialize {
+  my $self = shift;
+  my @config_file = ($ENV{POD_LUALATEX}, glob '~/.pod-lualatex');
+  if (my ($file) = grep { $_ && -f $_ } @config_file) {
+    if (my $config = LoadFile($file)) {
+      $self->{$_} = $config->{$_} for keys %$config;
+    }
+  }
+  $self->SUPER::initialize;
+}
+
+
 1; # Magic true value required at end of module
 __END__
 
 =head1 NAME
 
-Pod::Lualatex - [One line description of module's purpose here]
-
-
-=head1 VERSION
-
-This document describes Pod::Lualatex version 0.0.1
+Pod::Lualatex - Convert Pod data to formatted lualatex
 
 
 =head1 SYNOPSIS
 
-    use Pod::Lualatex;
+  my $parser = Pod::Lualatex->new();
+  $parser->parse_from_file('file.pod', 'file.tex');
+
+or
+
+  perldoc -o lualatex ...
 
 
 =head1 DESCRIPTION
@@ -108,6 +118,30 @@ This document describes Pod::Lualatex version 0.0.1
 =item UserPreamble
 
 =item command
+
+=item initialize
+
+=back
+
+=head1 CONFIGURATION AND ENVIRONMENT
+
+=over
+
+=item C<~/.pod-lualatex>
+
+  ---
+  preamble: |-
+    \documentclass{ltjsarticle}
+    \usepackage[T1]{fontenc}
+    \usepackage{textcomp}
+    
+    $comment
+    
+    $makeindex
+    
+    \begin{document}
+    
+    $tableofcontents
 
 =back
 
