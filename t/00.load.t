@@ -1,0 +1,7 @@
+use Test::More tests => 1;
+
+BEGIN {
+use_ok( 'Pod::Lualatex' );
+}
+
+diag( "Testing Pod::Lualatex $Pod::Lualatex::VERSION" );
