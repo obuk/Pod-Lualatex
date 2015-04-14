@@ -1,0 +1,16 @@
+Makefile$
+\.#
+\.bak$
+\.bundle$
+\.old$
+\.orig$
+\.tar\.gz$
+\.tmp$
+^MANIFEST\.SKIP
+^MYMETA\.*
+^STAT\.*
+^\.git
+^blib
+^cover_db
+pm_to_blib$
+~$
