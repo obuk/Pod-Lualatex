@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.1');
+our $VERSION = qv('0.1.2');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
@@ -75,20 +75,12 @@ sub command {
   my ($command, $paragraph, $line_num, $parobj) = @_;
 
   if ($command eq 'encoding') {
-    binmode $self->{in_fh}, ":encoding($paragraph)";
-    binmode $self->{out_fh}, ":encoding(UTF-8)";
+    binmode $self->input_handle, ":encoding($paragraph)";
+    binmode $self->output_handle, ":encoding(UTF-8)";
     return;
   }
 
   $self->SUPER::command(@_);
-}
-
-
-sub _push_input_stream {
-  my $self = shift;
-  $self->{in_fh} = $_[0];
-  $self->{out_fh} = $_[1];
-  $self->SUPER::_push_input_stream(@_);
 }
 
 
@@ -129,8 +121,6 @@ or
 =item UserPreamble
 
 =item command
-
-=item _push_input_stream
 
 =item initialize
 
