@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.0');
+our $VERSION = qv('0.1.1');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
@@ -74,10 +74,21 @@ sub command {
   my $self = shift;
   my ($command, $paragraph, $line_num, $parobj) = @_;
 
-  # return if we don't care
-  return if $command eq 'encoding';
+  if ($command eq 'encoding') {
+    binmode $self->{in_fh}, ":encoding($paragraph)";
+    binmode $self->{out_fh}, ":encoding(UTF-8)";
+    return;
+  }
 
   $self->SUPER::command(@_);
+}
+
+
+sub _push_input_stream {
+  my $self = shift;
+  $self->{in_fh} = $_[0];
+  $self->{out_fh} = $_[1];
+  $self->SUPER::_push_input_stream(@_);
 }
 
 
@@ -119,6 +130,8 @@ or
 
 =item command
 
+=item _push_input_stream
+
 =item initialize
 
 =back
@@ -129,11 +142,20 @@ or
 
 =item C<~/.pod-lualatex>
 
-  ---
   preamble: |-
     \documentclass{ltjsarticle}
     \usepackage[T1]{fontenc}
     \usepackage{textcomp}
+    
+    %\usepackage[margin=2cm,nohead]{geometry}
+    \usepackage{newtxtext,newtxmath}
+    \usepackage{graphicx}
+    \usepackage{fancybox}
+    \usepackage{framed}
+    
+    \renewenvironment{verbatim}
+    {\VerbatimEnvironment\begin{oframed}\begin{Verbatim}}
+    {\end{Verbatim}\end{oframed}}
     
     $comment
     
