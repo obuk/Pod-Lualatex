@@ -1,13 +1,15 @@
-Makefile$
+^Makefile$
 \.#
 \.bak$
 \.bundle$
 \.old$
 \.orig$
 \.tar\.gz$
+\.tex$
 \.tmp$
 ^MANIFEST\.SKIP
 ^MYMETA\.*
+^Pod-Lualatex-.*
 ^STAT\.*
 ^\.git
 ^blib
