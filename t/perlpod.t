@@ -1,11 +1,12 @@
-#!perl -T
 # -*- mode: cperl -*-
 
+use strict;
+use warnings;
 use Test::More;
 
 # run: USE_LUALATEX=1 PERLDOC="-L ja" make test
 
-plan skip_all => 'set RUN_LUALATEX=1 to test all' unless $ENV{USE_LUALATEX};
+plan skip_all => 'set RUN_LUALATEX=1 to test all' unless $ENV{RUN_LUALATEX};
 
 use Perl6::Slurp;
 

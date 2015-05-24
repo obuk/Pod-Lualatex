@@ -118,11 +118,6 @@ sub parse_from_filehandle {
   close $tmp_fh;
   $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
 
-  # open my $fh, ">:encoding(UTF-8)", "a.tex";
-  open my $fh, ">", "a.tex";
-  print $fh $tex;
-  close $fh;
-
   print $out_fh $tex;
 }
 
