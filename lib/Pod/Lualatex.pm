@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.3');
+our $VERSION = qv('0.1.4');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
@@ -73,64 +73,57 @@ __TEX_HEADER__
 sub command {
   my $self = shift;
   my ($command, $paragraph, $line_num, $parobj) = @_;
-
   if ($command eq 'encoding') {
     binmode $self->input_handle, ":encoding($paragraph)";
     binmode $self->output_handle, ":encoding(UTF-8)";
-    return;
+  } else {
+    $self->SUPER::command(@_);
   }
-
-  $self->SUPER::command(@_);
-}
-
-
-sub _create_index {
-  my $self = shift;
-  (my $index = $self->SUPER::_create_index(@_)) =~ s/\s+/ /g;
-  $index =~ s/\S*?(\\{|\\})\S*//g; # can't use \{ \}
-  $index;
 }
 
 
 sub interior_sequence {
   my $self = shift;
-
   my ($seq_command, $seq_argument, $pod_seq) = @_;
-  my $iseq = $self->SUPER::interior_sequence(@_);
-  if ($seq_command eq 'X') {
-    $iseq =~ s/\n/ /g;
-    $iseq =~ s/\\index{\s*}//g;
-  }
-  $iseq;
 
+  # XXXXX: \index{ \{ } X<{>
+  return '' if $seq_command eq 'X' && $seq_argument =~ /{/;
+  $self->SUPER::interior_sequence(@_);
+}
+
+
+sub _create_index {
+  my $self = shift;
+  my ($paragraph) = @_;
+
+  # XXXXX: \index{ ... \n\n ... }
+  (my $index = $self->SUPER::_create_index(@_)) =~ s/\s+/ /g;
+  return $index;
 }
 
 
 sub parse_from_filehandle {
   my $self = shift;
-  my %opts = (ref $_[0] eq 'HASH') ? %{ shift() } : ();
-  my ($in_fh, $out_fh) = @_;
 
-  # open my $tmp_fh, ">:encoding(UTF-8)", \ my $tex;
-  open my $tmp_fh, ">", \ my $tex;
-  $self->{_TEMPORARY} = $tmp_fh;
-  $self->SUPER::parse_from_filehandle(%opts, $in_fh, $tmp_fh);
-  close $tmp_fh;
-  $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
-
-  print $out_fh $tex;
-}
-
-
-sub initialize {
-  my $self = shift;
+  # initialize
   my @config_file = ($ENV{POD_LUALATEX}, glob '~/.pod-lualatex');
   if (my ($file) = grep { $_ && -f $_ } @config_file) {
     if (my $config = LoadFile($file)) {
       $self->{$_} = $config->{$_} for keys %$config;
     }
   }
-  $self->SUPER::initialize;
+
+  my @opts = (ref $_[0] eq 'HASH') ? shift : ();
+  my ($in_fh, $out_fh) = @_;
+  open my $tmp_fh, ">", \ my $tex;
+  $self->{_TEMPORARY} = $tmp_fh;
+  $self->SUPER::parse_from_filehandle(@opts, $in_fh, $tmp_fh);
+  close $tmp_fh;
+
+  # concatenate subsequent verbatim
+  $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
+
+  print $out_fh $tex;
 }
 
 
@@ -160,15 +153,9 @@ or
 
 =item command
 
-=item initialize
-
 =item parse_from_filehandle
 
-=item temporary_handle
-
-=item _create_index
-
-=item interior_sequence
+=item interior_sequence, _create_index
 
 =back
 
@@ -186,12 +173,8 @@ or
     %\usepackage[margin=2cm,nohead]{geometry}
     \usepackage{newtxtext,newtxmath}
     \usepackage{graphicx}
-    \usepackage{fancybox}
-    \usepackage{framed}
-    
-    \renewenvironment{verbatim}
-    {\VerbatimEnvironment\begin{oframed}\begin{Verbatim}}
-    {\end{Verbatim}\end{oframed}}
+    \usepackage[framemethod=tikz]{mdframed}
+    \surroundwithmdframed[linewidth=1pt]{verbatim}
     
     $comment
     
