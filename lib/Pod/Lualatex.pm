@@ -4,70 +4,10 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.4');
+our $VERSION = qv('0.1.5');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
-
-sub UserPreamble {
-  my $self = shift;
-
-  # Get the pod identification
-  # This should really come from the '=head1 NAME' paragraph
-
-  my $infile = $self->input_file;
-  my $class = ref($self);
-  my $date = gmtime(time);
-
-  # Comment message to say where this came from
-  my %x; $x{comment} = << "__TEX_COMMENT__";
-%%  Latex generated from POD in document $infile
-%%  Using the perl module $class
-%%  Converted on $date
-__TEX_COMMENT__
-
-  # Make our own preamble
-
-  # Code to initialise index making
-  # Use an array so that we can prepend comment if required
-  my @makeidx = (
-    '\usepackage{makeidx}',
-    '\makeindex',
-   );
-
-  unless ($self->MakeIndex) {
-    foreach (@makeidx) {
-      $_ = '%% ' . $_;
-    }
-  }
-  $x{makeindex} = join("\n", @makeidx) . "\n";
-
-  # Table of contents
-  $x{tableofcontents} = '\tableofcontents';
-  $x{tableofcontents} = '%% ' . $x{tableofcontents}
-    unless $self->TableOfContents;
-
-  my $preamble = $self->{preamble};
-
-  # Roll our own
-  $preamble //= << '__TEX_HEADER__';
-\documentclass{ltjsarticle}
-\usepackage[T1]{fontenc}
-\usepackage{textcomp}
-
-$comment
-
-$makeindex
-
-\begin{document}
-
-$tableofcontents
-
-__TEX_HEADER__
-
-  $preamble =~ s/\$(\w+)/$x{$1}/g;
-  $preamble;
-}
 
 
 sub command {
@@ -75,7 +15,6 @@ sub command {
   my ($command, $paragraph, $line_num, $parobj) = @_;
   if ($command eq 'encoding') {
     binmode $self->input_handle, ":encoding($paragraph)";
-    binmode $self->output_handle, ":encoding(UTF-8)";
   } else {
     $self->SUPER::command(@_);
   }
@@ -105,25 +44,36 @@ sub _create_index {
 sub parse_from_filehandle {
   my $self = shift;
 
-  # initialize
+  my @opts = (ref $_[0] eq 'HASH') ? shift : ();
+  my ($in_fh, $out_fh) = @_;
+  open my $tmp_fh, ">:encoding(UTF-8)", \ my $tex;
+  $self->SUPER::parse_from_filehandle(@opts, $in_fh, $tmp_fh);
+  close $tmp_fh;
+
+  my $header = <<"__TEX_HEADER__";
+\\documentclass{ltjsarticle}
+\\usepackage{luatexja}
+__TEX_HEADER__
+
+  # replace header
+  $tex =~ s/^\\document\w+{article}(.*?)(\n%%\s+Latex\s+generated)/$header$2/s;
+
+  # concatenate subsequent verbatim
+  $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
+
+  print $out_fh $tex;
+}
+
+
+sub initialize {
+  my $self = shift;
   my @config_file = ($ENV{POD_LUALATEX}, glob '~/.pod-lualatex');
   if (my ($file) = grep { $_ && -f $_ } @config_file) {
     if (my $config = LoadFile($file)) {
       $self->{$_} = $config->{$_} for keys %$config;
     }
   }
-
-  my @opts = (ref $_[0] eq 'HASH') ? shift : ();
-  my ($in_fh, $out_fh) = @_;
-  open my $tmp_fh, ">", \ my $tex;
-  $self->{_TEMPORARY} = $tmp_fh;
-  $self->SUPER::parse_from_filehandle(@opts, $in_fh, $tmp_fh);
-  close $tmp_fh;
-
-  # concatenate subsequent verbatim
-  $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
-
-  print $out_fh $tex;
+  $self->SUPER::initialize;
 }
 
 
@@ -140,52 +90,62 @@ Pod::Lualatex - Convert Pod data to formatted lualatex
   my $parser = Pod::Lualatex->new();
   $parser->parse_from_file('file.pod', 'file.tex');
 
-or
-
-  perldoc -o lualatex ...
-
 
 =head1 DESCRIPTION
 
-=over
+C<Pod::Lualatex> is a derived class from L<Pod::LaTeX>.
+This module rewrites the header lines of the C<Pod::LaTeX> outputs
+before C<%% Latex generated ...>. The output is as follows:
 
-=item UserPreamble
+  \documentclass{ltjsarticle}
+  \usepackage{luatexja}
+  
+  %%  Latex generated ...
 
-=item command
-
-=item parse_from_filehandle
-
-=item interior_sequence, _create_index
-
-=back
 
 =head1 CONFIGURATION AND ENVIRONMENT
+
+By default, C<Pod::Lualatex> will read a configuration from the
+C<~/.pod-lualatex>, or the file specified in the C<POD_LUALATEX>
+environment variable.
 
 =over
 
 =item C<~/.pod-lualatex>
 
-  preamble: |-
+The format is L<YAML>.
+
+  UserPreamble: |-
     \documentclass{ltjsarticle}
-    \usepackage[T1]{fontenc}
-    \usepackage{textcomp}
-    
-    %\usepackage[margin=2cm,nohead]{geometry}
-    \usepackage{newtxtext,newtxmath}
-    \usepackage{graphicx}
-    \usepackage[framemethod=tikz]{mdframed}
-    \surroundwithmdframed[linewidth=1pt]{verbatim}
-    
-    $comment
-    
-    $makeindex
-    
+    \usepackage{luatexja}
+    ...
     \begin{document}
-    
-    $tableofcontents
+
+for example, you need TOC:
+
+  TableOfContents: 1
+  LevelNoNum: 3
+  UserPreamble: |-
+    ...
+    \usepackage{makeidx}
+    \makeindex
+    \begin{document}
+    \tableofcontents
+    %\newpage
+
+surround the verbatim:
+
+  UserPreamble: |-
+    ...
+    \usepackage[framemethod=tikz]{mdframed}
+    \newrobustcmd*{\myframed}[2][]{%
+      \BeforeBeginEnvironment{#2}{\medskip\begin{mdframed}[#1]\medskip}%
+      \AfterEndEnvironment{#2}{\medskip\end{mdframed}}%
+    }
+    \myframed[linewidth=1pt,roundcorner=10pt]{verbatim}
+
 
 =back
-
 
 =head1 AUTHOR
 

@@ -4,6 +4,7 @@
 \.bundle$
 \.old$
 \.orig$
+\.pdf$
 \.tar\.gz$
 \.tex$
 \.tmp$
@@ -14,5 +15,6 @@
 ^\.git
 ^blib
 ^cover_db
+^texput\.
 pm_to_blib$
 ~$

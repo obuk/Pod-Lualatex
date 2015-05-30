@@ -1,0 +1,7 @@
+UserPreamble: |-
+  \documentclass{ltjsarticle}
+  \usepackage{luatexja}
+  %\usepackage{makeidx}
+  %\makeindex
+  \begin{document}
+  %\tableofcontents

@@ -21,5 +21,7 @@ nytprof.out
 
 # and more
 *~
+*.pdf
 *.tar.gz
 /MANIFEST
+/texput.*
