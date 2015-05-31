@@ -18,28 +18,26 @@ sub pod2latex {
   if (-f 'texput.log') {
     my @log = slurp 'texput.log';
     my $err = grep { /Fatal error occurred/ } @log;
-    ok !$err, join(' ', 'perldoc', '-o', 'lualatex', $pod);
+    ok !$err, join(' ', join('=', 'POD_LUALATEX', $ENV{POD_LUALATEX} // ''),
+                   'perldoc', '-o', 'lualatex', $pod);
   }
 }
 
-my @pod = qw/ perldsc perlsyn perlop perldebug perlref /;
 
-for my $pod (@pod) {
+for (
+  (map { [$_, undef ] } qw/ perldsc perlsyn perlop perldebug perlref /),
+  (map { ['perlintro', $_ ] } glob "t/*.yml"),
+  # [qw(perlvar t/hyperlink.yml)]
+ ) {
+  my ($pod, $yml) = @$_;
+  my $name = $pod;
   delete $ENV{POD_LUALATEX};
-  diag $pod;
-  unlink glob "texput.*";
-  pod2latex($pod);
-  system "cp texput.pdf $pod.pdf";
-}
-
-
-my @yml = glob "t/*.yml";
-
-for my $yml (@yml) {
-  my $pod = 'perlintro';
-  $ENV{POD_LUALATEX} = $yml;
-  my ($cf) = $yml =~ /([\w-]+).yml/;
-  my $name = "$pod-$cf";
+  if ($yml) {
+    if (my ($opt) = ($yml =~ /([\w-]+).yml/, '')) {
+      $ENV{POD_LUALATEX} = $yml;
+      $name = "$pod-$opt";
+    }
+  }
   diag $name;
   unlink glob "texput.*";
   pod2latex($pod);

@@ -4,11 +4,18 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.5');
+our $VERSION = qv('0.1.6');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
 
+use Pod::ParseLink;
+use HTML::Entities;
+use URI::Encode qw(uri_encode uri_decode);
+
+use Data::Dumper;
+$Data::Dumper::Indent = 1;
+$Data::Dumper::Terse = 1;
 
 sub command {
   my $self = shift;
@@ -25,9 +32,53 @@ sub interior_sequence {
   my $self = shift;
   my ($seq_command, $seq_argument, $pod_seq) = @_;
 
-  # XXXXX: \index{ \{ } X<{>
-  return '' if $seq_command eq 'X' && $seq_argument =~ /{/;
-  $self->SUPER::interior_sequence(@_);
+  if ($seq_command eq 'X') {
+    # XXXXX: \index{ \{ } X<{>
+    return '' if $seq_argument =~ /{/;
+
+  } elsif ($seq_command eq 'L') {
+
+    if ($self->{HyperLink}) {
+      (my $unescape = $seq_argument) =~ s/\\([{}_\$%&#])/$1/g;
+      $unescape =~ s/\\([^~]){}/$1/g;
+      $unescape =~ s/\$\\backslash\$/\\/g;
+      my ($text, $inferred, $page, $section, $type) = parselink($unescape);
+      $inferred =~ s/"//sg if $inferred;
+      $self->_output("% HyperLink: L<$unescape>\n");
+      (my $debug = Dumper(
+        { text => $text, inferred => $inferred, page => $page,
+          section => $section, type => $type, })) =~ s/^/% /gm;
+      $self->_output("$debug\n");
+      my $_section;
+      if ($section) {
+        $section =~ s/^"(.*)"$/$1/;
+        $section =~ s/^\s*(.*?)\s*$/$1/;
+        $section =~ s/\s+/ /sg;
+        $_section = $section;
+        $section =~ tr/ /-/;  # metacpan.org, perldoc.perl.org
+      }
+      if (my $link = $self->{HyperLink}{$type}) {
+        my %x = ();
+        $x{page    } = $page                 if $page;
+        $x{section } = uri_encode($section)  if $section;
+        $x{_section} = $self->_replace_special_chars($_section) if $_section;
+        $x{inferred} = $self->_replace_special_chars($inferred) if $inferred;
+        for (grep { $_ } ref $link? @$link : $link) {
+          my $undef = 0;
+          (my $link = $_) =~ s!\$(\w+)!do {
+            $undef++ unless defined $x{$1}; $x{$1} // '';
+          }!eg;
+          # $self->_output("% HyperLink: L<$unescape> => $link ($undef)\n");
+          return $link unless $undef;
+        }
+      }
+
+    }
+
+  }
+
+  return $self->SUPER::interior_sequence(@_);
+
 }
 
 
@@ -35,9 +86,28 @@ sub _create_index {
   my $self = shift;
   my ($paragraph) = @_;
 
-  # XXXXX: \index{ ... \n\n ... }
-  (my $index = $self->SUPER::_create_index(@_)) =~ s/\s+/ /g;
-  return $index;
+  # XXXXX: section{ \index{ ... \n ... } }
+  my $index = $self->SUPER::_create_index(@_);
+  my @index = grep { $_ } split /\n/, $index;
+  s/^\s*(.*?)\s*$/$1/ for @index;
+  if ($self->{HyperLink}) {
+    $self->_output("\\hypertarget{$_}{}\n") for @index;
+  }
+  return join("\n", @index);
+}
+
+
+sub head {
+  my $self = shift;
+  my $pos = tell $self->output_handle;
+  $self->SUPER::head(@_);
+  my $cur = tell $self->output_handle;
+  seek($self->output_handle, $pos, 0);
+  read $self->output_handle, my $code, $cur - $pos;
+  my @code = grep { $_ } split /\n/, $code;
+  s/^\s*(.*?)\s*$/$1/ for @code;
+  seek($self->output_handle, $pos, 0);
+  $self->_output("$_\n") for @code;
 }
 
 
@@ -46,7 +116,7 @@ sub parse_from_filehandle {
 
   my @opts = (ref $_[0] eq 'HASH') ? shift : ();
   my ($in_fh, $out_fh) = @_;
-  open my $tmp_fh, ">:encoding(UTF-8)", \ my $tex;
+  open my $tmp_fh, "+>:encoding(UTF-8)", \ my $tex;
   $self->SUPER::parse_from_filehandle(@opts, $in_fh, $tmp_fh);
   close $tmp_fh;
 
