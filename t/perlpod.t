@@ -8,13 +8,20 @@ use Test::More;
 
 plan skip_all => 'RUN_LUALATEX=1 to run perldoc -o lualatex' unless $ENV{RUN_LUALATEX};
 
+use_ok('Pod::Lualatex');
+
 use Perl6::Slurp;
 
 sub pod2latex {
   my $pod = shift;
-  open my $perldoc, "-|:encoding(UTF-8)", 'perldoc', '-o', 'lualatex', $pod;
-  open STDIN, "<&", $perldoc;
-  system("lualatex >/dev/null");
+  open my $perldoc, "-|", 'perldoc', '-u', $pod;
+  open my $tex, ">", "texput.tex";
+  my $parser = Pod::Lualatex->new();
+  $parser->parse_from_filehandle($perldoc, $tex);
+  close $perldoc;
+  close $tex;
+  open STDIN, '<', '/dev/null';
+  system("lualatex texput.tex >/dev/null"); # for 1..2;
   if (-f 'texput.log') {
     my @log = slurp 'texput.log';
     my $err = grep { /Fatal error occurred/ } @log;
@@ -27,7 +34,9 @@ sub pod2latex {
 for (
   (map { [$_, undef ] } qw/ perldsc perlsyn perlop perldebug perlref /),
   (map { ['perlintro', $_ ] } glob "t/*.yml"),
-  # [qw(perlvar t/hyperlink.yml)]
+  # [qw(perlvar t/hyperlink.yml)],
+  # [qw(perlintro t/hyperlink.yml)],
+  [qw(perlpod t/hyperlink.yml)],
  ) {
   my ($pod, $yml) = @$_;
   my $name = $pod;

@@ -1,19 +1,14 @@
 UserPreamble: |-
   \documentclass{ltjsarticle}
   \usepackage{luatexja}
-  \usepackage[margin=2cm,nohead]{geometry}
-  \usepackage{newtxtext,newtxmath}
-  \usepackage{graphicx}
-  \usepackage[framemethod=tikz]{mdframed}
-  \newrobustcmd*{\myframed}[2][]{%
-    \BeforeBeginEnvironment{#2}{\medskip\begin{mdframed}[#1]\medskip}%
-    \AfterEndEnvironment{#2}{\medskip\end{mdframed}}%
-  }
-  \myframed[linewidth=1pt,roundcorner=10pt]{verbatim}
   \usepackage[pdfencoding=auto]{hyperref}
   \usepackage{makeidx}
   \makeindex
   \begin{document}
+  %\tableofcontents
+UserPostamble: |-
+  %\printindex
+  \end{document}
 TableOfContents: 0
 LevelNoNum: 3
 HyperLink:

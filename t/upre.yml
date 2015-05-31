@@ -5,3 +5,6 @@ UserPreamble: |-
   %\makeindex
   \begin{document}
   %\tableofcontents
+UserPostamble: |-
+  %\printindex
+  \end{document}

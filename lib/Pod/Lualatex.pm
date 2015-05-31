@@ -32,11 +32,7 @@ sub interior_sequence {
   my $self = shift;
   my ($seq_command, $seq_argument, $pod_seq) = @_;
 
-  if ($seq_command eq 'X') {
-    # XXXXX: \index{ \{ } X<{>
-    return '' if $seq_argument =~ /{/;
-
-  } elsif ($seq_command eq 'L') {
+  if ($seq_command eq 'L') {
 
     if ($self->{HyperLink}) {
       (my $unescape = $seq_argument) =~ s/\\([{}_\$%&#])/$1/g;
@@ -84,16 +80,12 @@ sub interior_sequence {
 
 sub _create_index {
   my $self = shift;
-  my ($paragraph) = @_;
 
   # XXXXX: section{ \index{ ... \n ... } }
-  my $index = $self->SUPER::_create_index(@_);
-  my @index = grep { $_ } split /\n/, $index;
-  s/^\s*(.*?)\s*$/$1/ for @index;
-  if ($self->{HyperLink}) {
-    $self->_output("\\hypertarget{$_}{}\n") for @index;
-  }
-  return join("\n", @index);
+  my $chunk = $self->SUPER::_create_index(@_);
+  my @chunk = grep { $_ } split /\n/, $chunk;
+  s/^\s*(.*?)\s*$/$1/ for @chunk;
+  return join("\n", grep {$_} @chunk);
 }
 
 
@@ -103,11 +95,14 @@ sub head {
   $self->SUPER::head(@_);
   my $cur = tell $self->output_handle;
   seek($self->output_handle, $pos, 0);
-  read $self->output_handle, my $code, $cur - $pos;
-  my @code = grep { $_ } split /\n/, $code;
-  s/^\s*(.*?)\s*$/$1/ for @code;
+  read $self->output_handle, my $chunk, $cur - $pos;
+  my @chunk = grep { $_ } split /\n/, $chunk;
+  s/^\s*(.*?)\s*$/$1/ for @chunk;
   seek($self->output_handle, $pos, 0);
-  $self->_output("$_\n") for @code;
+  if (my ($label) = $chunk[0] =~ /section*?{([^}]+)(\\label.*|}|)$/) {
+    $chunk = "\\hypertarget{$label}{".join("\n", @chunk)."}\n";
+  }
+  $self->_output($chunk);
 }
 
 
@@ -130,6 +125,13 @@ __TEX_HEADER__
 
   # concatenate subsequent verbatim
   $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
+
+  # XXXXX
+  $tex =~ s/\n\n\s*(\\index{)/\n$1/sg;
+  $tex =~ s/^(\s*\\index{\\{})$/%$1/mg;
+
+  # XXXXX: POD_LUALATEX=t/hyperlink.yml perldoc -o lualatex perlintro
+  $tex =~ s/(\\\w+){(\\href{[^}]+})({[^}]+})}/${2}{$1$3}/sg;
 
   print $out_fh $tex;
 }
