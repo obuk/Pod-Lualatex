@@ -11,6 +11,7 @@ use YAML::Any qw/LoadFile/;
 use Pod::ParseLink;
 use HTML::Entities;
 use URI::Encode qw(uri_encode);
+use Encode;
 
 sub command {
   my $self = shift;
@@ -102,11 +103,13 @@ sub head {
     (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
   }
 
-  my $pos = tell $self->output_handle;
+  open my $tmp_fh, ">:encoding(UTF-8)", \my $head;
+  my $out_fh = $self->{_OUTPUT};
+  $self->{_OUTPUT} = $tmp_fh;
   $self->SUPER::head($num, $paragraph, $parobj);
-  my $bytes = tell($self->output_handle) - $pos;
-  seek($self->output_handle, $pos, 0);
-  read($self->output_handle, my $head, $bytes);
+  close $tmp_fh;
+  $self->{_OUTPUT} = $out_fh;
+  $head = decode('UTF-8', $head);
 
   while ($head =~ s/ \s* (\\ (?:index|label) $block) //x) {
     (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
@@ -115,7 +118,6 @@ sub head {
   my ($tag, $name) = ($1, $2);
   my $target = join("\n", $name, sort keys %x);
 
-  seek($self->output_handle, $pos, 0);
   if ($self->HyperLink) {
     $self->_output("\\hypertarget{$name}{${tag}{$target}}\n");
   } else {
@@ -129,7 +131,7 @@ sub parse_from_filehandle {
 
   my @opts = (ref $_[0] eq 'HASH') ? shift : ();
   my ($in_fh, $out_fh) = @_;
-  open my $tmp_fh, "+>:encoding(UTF-8)", \ my $tex;
+  open my $tmp_fh, ">:encoding(UTF-8)", \ my $tex;
   $self->SUPER::parse_from_filehandle(@opts, $in_fh, $tmp_fh);
   close $tmp_fh;
 
