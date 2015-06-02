@@ -10,6 +10,7 @@ my $trustme = { trustme => [
   qw/
       command
       head
+      HyperLink
       initialize
       interior_sequence
       parse_from_filehandle

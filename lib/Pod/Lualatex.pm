@@ -8,14 +8,9 @@ our $VERSION = qv('0.1.6');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
-
 use Pod::ParseLink;
 use HTML::Entities;
-use URI::Encode qw(uri_encode uri_decode);
-
-use Data::Dumper;
-$Data::Dumper::Indent = 1;
-$Data::Dumper::Terse = 1;
+use URI::Encode qw(uri_encode);
 
 sub command {
   my $self = shift;
@@ -28,43 +23,47 @@ sub command {
 }
 
 
+sub HyperLink {
+   my $self = shift;
+   if (@_) {
+     $self->{HyperLink} = shift;
+   }
+   return $self->{HyperLink};
+}
+
+
 sub interior_sequence {
   my $self = shift;
   my ($seq_command, $seq_argument, $pod_seq) = @_;
 
   if ($seq_command eq 'L') {
 
-    if ($self->{HyperLink}) {
-      (my $unescape = $seq_argument) =~ s/\\([{}_\$%&#])/$1/g;
-      $unescape =~ s/\\([^~]){}/$1/g;
+    if (ref $self->HyperLink) {
+      my $unescape = $self->_clean_latex_commands($seq_argument);
+      $unescape =~ s/\\([{}_\$%&#])/$1/g;
+      $unescape =~ s/\\([\^~]){}/$1/g;
       $unescape =~ s/\$\\backslash\$/\\/g;
-      my ($text, $inferred, $page, $section, $type) = parselink($unescape);
+      my ($text, $inferred, $name, $section, $type) = parselink($unescape);
       $inferred =~ s/"//sg if $inferred;
-      $self->_output("% HyperLink: L<$unescape>\n");
-      (my $debug = Dumper(
-        { text => $text, inferred => $inferred, page => $page,
-          section => $section, type => $type, })) =~ s/^/% /gm;
-      $self->_output("$debug\n");
-      my $_section;
+      my $label;
       if ($section) {
         $section =~ s/^"(.*)"$/$1/;
         $section =~ s/^\s*(.*?)\s*$/$1/;
         $section =~ s/\s+/ /sg;
-        $_section = $section;
+        ($label = $section) =~ s/\s+/_/gs;
         $section =~ tr/ /-/;  # metacpan.org, perldoc.perl.org
       }
-      if (my $link = $self->{HyperLink}{$type}) {
+      if (my $link = $self->HyperLink->{$type}) {
         my %x = ();
-        $x{page    } = $page                 if $page;
-        $x{section } = uri_encode($section)  if $section;
-        $x{_section} = $self->_replace_special_chars($_section) if $_section;
-        $x{inferred} = $self->_replace_special_chars($inferred) if $inferred;
+        $x{n} = $name                 if $name;
+        $x{s} = uri_encode($section)  if $section;
+        $x{l} = $label                if $label;
+        $x{i} = $self->_replace_special_chars($inferred) if $inferred;
         for (grep { $_ } ref $link? @$link : $link) {
           my $undef = 0;
-          (my $link = $_) =~ s!\$(\w+)!do {
+          (my $link = $_) =~ s!\$(\w)!do {
             $undef++ unless defined $x{$1}; $x{$1} // '';
           }!eg;
-          # $self->_output("% HyperLink: L<$unescape> => $link ($undef)\n");
           return $link unless $undef;
         }
       }
@@ -80,29 +79,48 @@ sub interior_sequence {
 
 sub _create_index {
   my $self = shift;
-
-  # XXXXX: section{ \index{ ... \n ... } }
+  # XXXXX: section{ \\index{ ... \n{2,} ... } }
   my $chunk = $self->SUPER::_create_index(@_);
   my @chunk = grep { $_ } split /\n/, $chunk;
-  s/^\s*(.*?)\s*$/$1/ for @chunk;
-  return join("\n", grep {$_} @chunk);
+  # XXXXX: \\index{ \\{ (\\})? }
+  return join("\n", grep { !/^ ( \s* | \\{ (\\})? ) $/x } @chunk);
 }
 
 
 sub head {
   my $self = shift;
-  my $pos = tell $self->output_handle;
-  $self->SUPER::head(@_);
-  my $cur = tell $self->output_handle;
-  seek($self->output_handle, $pos, 0);
-  read $self->output_handle, my $chunk, $cur - $pos;
-  my @chunk = grep { $_ } split /\n/, $chunk;
-  s/^\s*(.*?)\s*$/$1/ for @chunk;
-  seek($self->output_handle, $pos, 0);
-  if (my ($label) = $chunk[0] =~ /section*?{([^}]+)(\\label.*|}|)$/) {
-    $chunk = "\\hypertarget{$label}{".join("\n", @chunk)."}\n";
+  my ($num, $paragraph, $parobj) = @_;
+
+  my %x;
+  my $block = qr/ (?&block)
+                  (?(DEFINE)
+                    (?<block> { (?&token)* } )
+                    (?<token> \\. | [^{}] | (?&block) )
+                  ) /x;
+
+  while ($paragraph =~ s/ \s* (\\ (?:index|label) $block) //x) {
+    (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
   }
-  $self->_output($chunk);
+
+  my $pos = tell $self->output_handle;
+  $self->SUPER::head($num, $paragraph, $parobj);
+  my $bytes = tell($self->output_handle) - $pos;
+  seek($self->output_handle, $pos, 0);
+  read($self->output_handle, my $head, $bytes);
+
+  while ($head =~ s/ \s* (\\ (?:index|label) $block) //x) {
+    (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
+  }
+  $head =~ /(\\\w+)\*?{(.*?)}$/s;
+  my ($tag, $name) = ($1, $2);
+  my $target = join("\n", $name, sort keys %x);
+
+  seek($self->output_handle, $pos, 0);
+  if ($self->HyperLink) {
+    $self->_output("\\hypertarget{$name}{${tag}{$target}}\n");
+  } else {
+    $self->_output("${tag}{$target}\n");
+  }
 }
 
 
@@ -115,20 +133,8 @@ sub parse_from_filehandle {
   $self->SUPER::parse_from_filehandle(@opts, $in_fh, $tmp_fh);
   close $tmp_fh;
 
-  my $header = <<"__TEX_HEADER__";
-\\documentclass{ltjsarticle}
-\\usepackage{luatexja}
-__TEX_HEADER__
-
-  # replace header
-  $tex =~ s/^\\document\w+{article}(.*?)(\n%%\s+Latex\s+generated)/$header$2/s;
-
   # concatenate subsequent verbatim
   $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
-
-  # XXXXX
-  $tex =~ s/\n\n\s*(\\index{)/\n$1/sg;
-  $tex =~ s/^(\s*\\index{\\{})$/%$1/mg;
 
   # XXXXX: POD_LUALATEX=t/hyperlink.yml perldoc -o lualatex perlintro
   $tex =~ s/(\\\w+){(\\href{[^}]+})({[^}]+})}/${2}{$1$3}/sg;
@@ -166,26 +172,17 @@ Pod::Lualatex - Convert Pod data to formatted lualatex
 =head1 DESCRIPTION
 
 C<Pod::Lualatex> is a derived class from L<Pod::LaTeX>.
-This module rewrites the header lines of the C<Pod::LaTeX> outputs
-before C<%% Latex generated ...>. The output is as follows:
-
-  \documentclass{ltjsarticle}
-  \usepackage{luatexja}
-  
-  %%  Latex generated ...
-
-
-=head1 CONFIGURATION AND ENVIRONMENT
-
 By default, C<Pod::Lualatex> will read a configuration from the
 C<~/.pod-lualatex>, or the file specified in the C<POD_LUALATEX>
 environment variable.
 
+The format of the C<~/.pod-lualatex> is L<YAML>.
+
 =over
 
-=item C<~/.pod-lualatex>
+=item *
 
-The format is L<YAML>.
+replace the preamble:
 
   UserPreamble: |-
     \documentclass{ltjsarticle}
@@ -193,17 +190,28 @@ The format is L<YAML>.
     ...
     \begin{document}
 
-for example, you need TOC:
+=item *
 
-  TableOfContents: 1
-  LevelNoNum: 3
+use LE<lt>E<gt> as a hyperlink:
+
   UserPreamble: |-
     ...
-    \usepackage{makeidx}
-    \makeindex
-    \begin{document}
-    \tableofcontents
-    %\newpage
+    \usepackage[pdfencoding=auto]{hyperref}
+  HyperLink:
+    pod:
+      - '\href{https://metacpan.org/module/$n#$s}{$i}'
+      - '\href{https://metacpan.org/module/$n}{$i}'
+      - '\hyperref[$l]{$i}'
+    url: '\href{$n}{$i}'
+
+You can find some variables in the C<HyperLink:>. The C<$i>, C<$n>,
+C<$s>, C<$l> are result of L<Pod::ParseLink>.
+
+   $i: $inferred              $l: $section, s/\s+/_/g
+   $n: $name                  pod: url: $type
+   $s: $section, uri_encode
+
+=item *
 
 surround the verbatim:
 
@@ -215,7 +223,6 @@ surround the verbatim:
       \AfterEndEnvironment{#2}{\medskip\end{mdframed}}%
     }
     \myframed[linewidth=1pt,roundcorner=10pt]{verbatim}
-
 
 =back
 
