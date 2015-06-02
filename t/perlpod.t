@@ -33,6 +33,8 @@ sub pod2latex {
 
 use File::Basename;
 
+delete $ENV{PERLDOC};
+
 chop(my $perl_pod = `perldoc -l perl`);
 my $pod_dir = dirname $perl_pod;
 my @perlpod = map { /(\w+)\.pod$/; $1 } glob "$pod_dir/perl*.pod";
@@ -44,7 +46,6 @@ for (
  ) {
   my ($lang, $pod, $yml) = @$_;
   my $name = $pod;
-  delete $ENV{PERLDOC};
   delete $ENV{POD_LUALATEX};
   if ($yml) {
     if (my ($opt) = ($yml =~ /([\w-]+).yml/, '')) {

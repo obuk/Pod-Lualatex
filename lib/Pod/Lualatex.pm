@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.6');
+our $VERSION = qv('0.1.7');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
@@ -92,37 +92,15 @@ sub head {
   my $self = shift;
   my ($num, $paragraph, $parobj) = @_;
 
-  my %x;
-  my $block = qr/ (?&block)
-                  (?(DEFINE)
-                    (?<block> { (?&token)* } )
-                    (?<token> \\. | [^{}] | (?&block) )
-                  ) /x;
+  my $index_command =
+    qr/ \\ (?:index|label) (?&block)
+        (?(DEFINE)
+          (?<block> { (?&token)* } )
+          (?<token> \\. | [^{}] | (?&block) )
+        ) /x;
 
-  while ($paragraph =~ s/ \s* (\\ (?:index|label) $block) //x) {
-    (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
-  }
-
-  open my $tmp_fh, ">:encoding(UTF-8)", \my $head;
-  my $out_fh = $self->{_OUTPUT};
-  $self->{_OUTPUT} = $tmp_fh;
+  $paragraph =~ s/ \s* $index_command //sxg;
   $self->SUPER::head($num, $paragraph, $parobj);
-  close $tmp_fh;
-  $self->{_OUTPUT} = $out_fh;
-  $head = decode('UTF-8', $head);
-
-  while ($head =~ s/ \s* (\\ (?:index|label) $block) //x) {
-    (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
-  }
-  $head =~ /(\\\w+\*?){(.*?)}$/s;
-  my ($tag, $name) = ($1, $2);
-  my $target = join("\n", $name, sort keys %x);
-
-  if ($self->HyperLink) {
-    $self->_output("\\hypertarget{$name}{${tag}{$target}}\n");
-  } else {
-    $self->_output("${tag}{$target}\n");
-  }
 }
 
 
