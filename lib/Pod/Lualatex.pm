@@ -114,7 +114,7 @@ sub head {
   while ($head =~ s/ \s* (\\ (?:index|label) $block) //x) {
     (my $s = $1) =~ s/\s+/ /g; $x{$s}++;
   }
-  $head =~ /(\\\w+)\*?{(.*?)}$/s;
+  $head =~ /(\\\w+\*?){(.*?)}$/s;
   my ($tag, $name) = ($1, $2);
   my $target = join("\n", $name, sort keys %x);
 
