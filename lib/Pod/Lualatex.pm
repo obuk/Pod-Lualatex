@@ -46,20 +46,27 @@ sub interior_sequence {
       $unescape =~ s/\$\\backslash\$/\\/g;
       my ($text, $inferred, $name, $section, $type) = parselink($unescape);
       $inferred =~ s/"//sg if $inferred;
-      my $label;
       if ($section) {
         $section =~ s/^"(.*)"$/$1/;
         $section =~ s/^\s*(.*?)\s*$/$1/;
         $section =~ s/\s+/ /sg;
-        ($label = $section) =~ s/\s+/_/gs;
-        $section =~ tr/ /-/;  # metacpan.org, perldoc.perl.org
       }
+      my ($man_name, $man_sect);
+      if ($type eq 'man') {
+        ($man_name = $name) =~ s/\((.+?)\)$//s;
+        $man_sect = $1;
+      }
+      # L<name/section>     => $n/$s
+      # L<name(m)>          => $n($m)
+      # L<name(m)/section>  => $n($m)/$s
+      # L</section>         => /$s or /$l (for '\hyperref[$l]{$i}')
       if (my $link = $self->HyperLink->{$type}) {
         my %x = ();
-        $x{n} = $name                 if $name;
-        $x{s} = uri_encode($section)  if $section;
-        $x{l} = $label                if $label;
-        $x{i} = $self->_replace_special_chars($inferred) if $inferred;
+        $x{n} = $man_name || $name                           if $name;
+        $x{m} = $man_sect                                    if $man_sect;
+        $x{s} = uri_encode( (my $x = $section) =~ tr/ /-/r ) if $section;
+        $x{l} = $self->_create_label($section)               if $section;
+        $x{i} = $self->_replace_special_chars($inferred)     if $inferred;
         for (grep { $_ } ref $link? @$link : $link) {
           my $undef = 0;
           (my $link = $_) =~ s!\$(\w)!do {
@@ -125,11 +132,12 @@ sub parse_from_filehandle {
 
 sub initialize {
   my $self = shift;
-  my @config_file = ($ENV{POD_LUALATEX}, glob '~/.pod-lualatex');
-  if (my ($file) = grep { $_ && -f $_ } @config_file) {
-    if (my $config = LoadFile($file)) {
-      $self->{$_} = $config->{$_} for keys %$config;
-    }
+  my $c = $self->{_lualatex} || do {
+    my $file = $ENV{POD_LUALATEX} // (glob '~/.pod-lualatex')[0];
+    -r $file && LoadFile($file) // { };
+  };
+  if ($c) {
+    $self->{$_} = $c->{$_} for keys %$c;
   }
   $self->SUPER::initialize;
 }
