@@ -11,36 +11,30 @@ my $parser = Pod::Lualatex->new(_lualatex => Load(<<'END'));
 HyperLink:
   url: '\href{$n}{$i}'
   pod:
-    - '\href{https://metacpan.org/module/$n#$s}{$i}'
+    - '\href{https://metacpan.org/module/$n\#$s}{$i}'
     - '\href{https://metacpan.org/module/$n}{$i}'
     - '\hyperref[$l]{$i}'
   man:
-    - '\href{http://linux.die.net/man/$m/$n#$s}{$i}'
+    - '\href{http://linux.die.net/man/$m/$n\#$s}{$i}'
     - '\href{http://linux.die.net/man/$m/$n}{$i}'
     - '\href{https://www.freebsd.org/cgi/man.cgi?query=$n}{$i}'
 END
 
-open my $tex_fh, "+>", \my $tex;
-$parser->parse_from_filehandle(\*DATA, $tex_fh);
+sub href {
+  my ($a, $b) = map { $parser->_replace_special_chars($_) } @_;
+  "\\href{$a}{$b}";
+}
 
-my @href = $tex =~ /(\\href{[^}]+}(?:{[^}]+})?)/gs;
+is $parser->interior_sequence('L', 'perl(1)/SYNOPSIS'),
+  href('http://linux.die.net/man/1/perl#SYNOPSIS', 'SYNOPSIS in perl(1)');
 
-my @href_expected =(
-  '\href{http://linux.die.net/man/1/perl#SYNOPSIS}{SYNOPSIS in perl(1)}',
-  '\href{https://metacpan.org/module/h2xs}{h2xs}',
-  '\href{http://perldoc.perl.org}{perldoc}',
- );
+is $parser->interior_sequence('L', 'h2xs'),
+  href('https://metacpan.org/module/h2xs', 'h2xs');
 
-is_deeply [@href], [@href_expected] or diag explain [@href];
+is $parser->interior_sequence('L', 'perldoc|http://perldoc.perl.org'),
+  href('http://perldoc.perl.org', 'perldoc');
+
+is $parser->interior_sequence('L', '/BUGS'),
+  '\hyperref[BUGS]{BUGS}';
 
 done_testing();
-
-__DATA__
-
-=pod
-
-L<perl(1)/SYNOPSIS>
-L<h2xs>
-L<perldoc|http://perldoc.perl.org>
-
-=cut

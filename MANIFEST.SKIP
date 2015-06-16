@@ -5,6 +5,7 @@
 \.old$
 \.orig$
 \.pdf$
+\.png$
 \.tar\.gz$
 \.tex$
 \.tmp$
