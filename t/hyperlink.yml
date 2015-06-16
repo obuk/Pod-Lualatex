@@ -14,7 +14,7 @@ UserPostamble: |-
 LevelNoNum: 3
 HyperLink:
   pod:
-    - '\href{https://metacpan.org/module/$n#$s}{$i}'
+    - '\href{https://metacpan.org/module/$n\#$s}{$i}'
     - '\href{https://metacpan.org/module/$n}{$i}'
     - '\hyperref[$l]{$i}'
   url: '\href{$n}{$i}'

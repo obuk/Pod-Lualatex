@@ -20,21 +20,26 @@ HyperLink:
     - '\href{https://www.freebsd.org/cgi/man.cgi?query=$n}{$i}'
 END
 
-sub href {
-  my ($a, $b) = map { $parser->_replace_special_chars($_) } @_;
-  "\\href{$a}{$b}";
-}
-
 is $parser->interior_sequence('L', 'perl(1)/SYNOPSIS'),
-  href('http://linux.die.net/man/1/perl#SYNOPSIS', 'SYNOPSIS in perl(1)');
+  '\href{http://linux.die.net/man/1/perl\#SYNOPSIS}{SYNOPSIS in perl(1)}';
 
 is $parser->interior_sequence('L', 'h2xs'),
-  href('https://metacpan.org/module/h2xs', 'h2xs');
+  '\href{https://metacpan.org/module/h2xs}{h2xs}';
 
 is $parser->interior_sequence('L', 'perldoc|http://perldoc.perl.org'),
-  href('http://perldoc.perl.org', 'perldoc');
+  '\href{http://perldoc.perl.org}{perldoc}';
 
 is $parser->interior_sequence('L', '/BUGS'),
   '\hyperref[BUGS]{BUGS}';
+
+is $parser->interior_sequence(
+  'L', 'http://www.cl.cam.ac.uk/~mgk25/unicode.html'),
+  '\href{http://www.cl.cam.ac.uk/\%7Emgk25/unicode.html}'.
+  '{http://www.cl.cam.ac.uk/\texttt{\~{}}mgk25/unicode.html}';
+
+is $parser->interior_sequence(
+  'L', 'http://www.cl.cam.ac.uk/%7Emgk25/unicode.html'),
+  '\href{http://www.cl.cam.ac.uk/\%7Emgk25/unicode.html}'.
+  '{http://www.cl.cam.ac.uk/\%7Emgk25/unicode.html}';
 
 done_testing();

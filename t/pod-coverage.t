@@ -14,6 +14,7 @@ my $trustme = { trustme => [
       initialize
       interior_sequence
       parse_from_filehandle
+      uri
     /] };
 
 pod_coverage_ok('Pod::Lualatex', $trustme);

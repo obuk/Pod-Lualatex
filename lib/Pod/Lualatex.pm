@@ -4,13 +4,14 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.8');
+our $VERSION = qv('0.1.9');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
 use Pod::ParseLink;
 use HTML::Entities;
-use URI::Encode qw(uri_encode);
+use URI::Encode qw(uri_encode uri_decode);
+use URI::Escape qw(uri_escape);
 use Encode;
 
 sub command {
@@ -64,12 +65,14 @@ sub interior_sequence {
         my %x = ();
         $x{n} = $man_name || $name                           if $name;
         $x{m} = $man_sect                                    if $man_sect;
-        if ($section) {
-          (my $s = $section) =~ s/\s+/-/;
-          $x{s} = $self->_replace_special_chars(uri_encode($s));
-          $x{l} = $self->_create_label($section);
-        }
-        $x{i} = $self->_replace_special_chars($inferred)     if $inferred;
+        $x{s} = (my $s = $section) =~ s/\s+/-/r              if $section;
+        $x{i} = $inferred                                    if $inferred;
+        $x{l} = $self->_create_label($section)               if $section;
+
+        $x{$_} = $self->_replace_special_chars($x{$_})       for qw/i/;
+        $x{$_} = $self->_replace_special_chars($self->uri($x{$_}))
+                                                             for qw/m n s/;
+
         for (grep { $_ } ref $link? @$link : $link) {
           my $undef = 0;
           (my $link = $_) =~ s!\$(\w)!do {
@@ -85,6 +88,15 @@ sub interior_sequence {
 
   return $self->SUPER::interior_sequence(@_);
 
+}
+
+
+sub uri {
+  my ($self, $x) = @_;
+  if ($x) {
+    $x = uri_escape(uri_encode(uri_decode($x)), '~');
+  }
+  $x;
 }
 
 
@@ -125,9 +137,6 @@ sub parse_from_filehandle {
 
   # concatenate subsequent verbatim
   $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
-
-  # XXXXX: POD_LUALATEX=t/hyperlink.yml perldoc -o lualatex perlintro
-  $tex =~ s/(\\\w+){(\\href{[^}]+})({[^}]+})}/${2}{$1$3}/sg;
 
   print $out_fh $tex;
 }
@@ -189,11 +198,15 @@ use LE<lt>E<gt> as a hyperlink:
     ...
     \usepackage[pdfencoding=auto]{hyperref}
   HyperLink:
+    url: '\href{$n}{$i}'
+    man:
+      - '\href{https://www.freebsd.org/cgi/man.cgi?query=$n($n)}{$i}'
+      #- '\href{http://linux.die.net/man/$m/$n\#$s}{$i}'
+      #- '\href{http://linux.die.net/man/$m/$n}{$i}'
     pod:
       - '\href{https://metacpan.org/module/$n\#$s}{$i}'
       - '\href{https://metacpan.org/module/$n}{$i}'
       - '\hyperref[$l]{$i}'
-    url: '\href{$n}{$i}'
 
 You can find some variables in the C<HyperLink:>. The C<$i>, C<$n>,
 C<$s>, C<$l> are result of L<Pod::ParseLink>.
