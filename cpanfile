@@ -1,6 +1,6 @@
 requires 'Pod::LaTeX';
 requires 'YAML::Any';
-requires 'Pod::ParseLink';
+requires 'Pod::ParseLink' => 1.10;
 requires 'HTML::Entities';
 requires 'URI::Encode';
 requires 'URI::Escape';

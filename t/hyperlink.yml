@@ -2,7 +2,7 @@ UserPreamble: |-
   \documentclass{ltjsarticle}
   \usepackage{luatexja}
   \usepackage[T1]{fontenc}
-  \usepackage{textcomp}
+  %\usepackage{textcomp}
   \usepackage[pdfencoding=auto]{hyperref}
   %\usepackage{makeidx}
   %\makeindex

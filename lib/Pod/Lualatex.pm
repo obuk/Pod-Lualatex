@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.9');
+our $VERSION = qv('0.1.10');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
@@ -65,14 +65,14 @@ sub interior_sequence {
         my %x = ();
         $x{n} = $man_name || $name                           if $name;
         $x{m} = $man_sect                                    if $man_sect;
-        $x{s} = (my $s = $section) =~ s/\s+/-/r              if $section;
+        $x{s} = do { (my $s = $section) =~ s/\s+/-/; $s }    if $section;
         $x{i} = $inferred                                    if $inferred;
         $x{l} = $self->_create_label($section)               if $section;
 
         $x{$_} = $self->_replace_special_chars($x{$_})       for qw/i/;
         $x{$_} = $self->_replace_special_chars($self->uri($x{$_}))
                                                              for qw/m n s/;
-
+        # expanding macro
         for (grep { $_ } ref $link? @$link : $link) {
           my $undef = 0;
           (my $link = $_) =~ s!\$(\w)!do {
@@ -211,7 +211,7 @@ use LE<lt>E<gt> as a hyperlink:
 You can find some variables in the C<HyperLink:>. The C<$i>, C<$n>,
 C<$s>, C<$l> are result of L<Pod::ParseLink>.
 
-   $i: $inferred              $l: $section, s/\s+/-/g
+   $i: $inferred              $l: $section, s/\s+/_/g
    $n: $name                  pod: url: $type
    $s: $section, uri_encode
 

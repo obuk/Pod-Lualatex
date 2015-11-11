@@ -2,7 +2,7 @@ UserPreamble: |-
   \documentclass{ltjsarticle}
   \usepackage{luatexja}
   \usepackage[T1]{fontenc}
-  \usepackage{textcomp}
+  %\usepackage{textcomp}
   %\usepackage[margin=2cm,nohead]{geometry}
   %\usepackage{graphicx}
   \usepackage[framemethod=tikz]{mdframed}
