@@ -4,7 +4,7 @@ use warnings;
 use strict;
 
 use version;
-our $VERSION = qv('0.1.10');
+our $VERSION = qv('0.1.11');
 
 use parent qw(Pod::LaTeX);
 use YAML::Any qw/LoadFile/;
@@ -102,11 +102,11 @@ sub uri {
 
 sub _create_index {
   my $self = shift;
-  # XXXXX: section{ \\index{ ... \n{2,} ... } }
+  # XXXXX: section{ \\index\{ ... \n{2,} ... } }
   my $chunk = $self->SUPER::_create_index(@_);
   my @chunk = grep { $_ } split /\n/, $chunk;
-  # XXXXX: \\index{ \\{ (\\})? }
-  return join("\n", grep { !/^ ( \s* | \\{ (\\})? ) $/x } @chunk);
+  # XXXXX: \\index{ \\\{ (\\\})? }
+  return join("\n", grep { !/^ ( \s* | \\\{ (\\\})? ) $/x } @chunk);
 }
 
 
@@ -136,7 +136,7 @@ sub parse_from_filehandle {
   close $tmp_fh;
 
   # concatenate subsequent verbatim
-  $tex =~ s/\\end{verbatim}\n\\begin{verbatim}//sg;
+  $tex =~ s/\\end\{verbatim\}\n\\begin\{verbatim\}//sg;
 
   print $out_fh $tex;
 }
